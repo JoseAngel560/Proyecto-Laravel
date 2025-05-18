@@ -1,0 +1,137 @@
+* {
+    font-family: 'Poppins', sans-serif;
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #ffffff; /* Fondo blanco */
+    color: #031A2A; /* Texto oscuro */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    width: 100%;
+    overflow-x: hidden;
+    flex-direction: column;
+    text-align: center;
+    padding: 20px;
+}
+
+/* Encabezado */
+header {
+    margin-bottom: 30px;
+    width: 100%;
+    max-width: 900px;
+}
+
+header h1 {
+    font-size: 2.8rem;
+    font-weight: 700;
+    margin: 0;
+    color: #031A2A;
+}
+
+header .logo {
+    width: 150px;
+    margin-top: 15px;
+}
+
+/* Contenedor de textos */
+.container {
+    width: 100%;
+    max-width: 900px;
+}
+
+.container h2 {
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin-top: 30px;
+    margin-bottom: 15px;
+    color: #031A2A;
+}
+
+.container p {
+    font-size: 1.1rem;
+    line-height: 1.6;
+    color: #333333;
+    margin-bottom: 20px;
+    padding: 0 10px;
+}
+
+/* Sección equipo */
+.team {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    flex-wrap: nowrap; /* Siempre en una fila */
+    margin-top: 40px;
+    width: 100%;
+    max-width: 900px;
+    overflow-x: auto; /* Scroll horizontal si no cabe */
+    padding-bottom: 10px;
+}
+
+/* Ocultar scrollbar en Webkit */
+.team::-webkit-scrollbar {
+    display: none;
+}
+.team {
+    -ms-overflow-style: none;  /* IE y Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+.team-member {
+    background: #f8f9fa;
+    border-radius: 15px;
+    padding: 25px 20px;
+    width: 250px;
+    box-shadow: 0 6px 15px rgba(3, 26, 42, 0.1);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+    flex-shrink: 0; /* No se reduce */
+    cursor: default;
+    text-align: center;
+}
+
+.team-member:hover {
+    box-shadow: 0 10px 25px rgba(3, 26, 42, 0.2);
+    transform: translateY(-5px);
+}
+
+.team-member img {
+    margin-bottom: 15px;
+   
+}
+
+.team-member h3 {
+    font-size: 1.3rem;
+    margin-bottom: 8px;
+    color: #031A2A;
+}
+
+.team-member p {
+    font-size: 1rem;
+    margin: 3px 0;
+    color: #555555;
+}
+
+/* Footer */
+footer {
+    margin-top: 50px;
+    font-size: 0.9rem;
+    color: #666666;
+    width: 100%;
+    max-width: 900px;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .team {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .team-member {
+        width: 90%;
+    }
+}
