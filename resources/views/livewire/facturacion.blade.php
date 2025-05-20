@@ -17,6 +17,9 @@
             <button type="button" class="btn btn-primary btn-sm" wire:click="abrirModalNuevoCliente">
                 <i class='bx bx-user-plus'></i> Nuevo Cliente
             </button>
+            <button type="button" class="btn btn-primary btn-sm" wire:click="openProductoModal">
+                <i class='bx bx-plus'></i> Nuevo Producto
+            </button>
         </div>
     </header>
 
@@ -450,6 +453,119 @@
         </div>
     </div>
 @endif
+
+<!-- Modal para Nuevo Producto -->
+@if($showProductoModal)
+    <div class="modal" style="display: flex;">
+        <div class="modal-content">
+            <span class="modal-close" wire:click="closeProductoModal">&times;</span>
+            <h2><i class='bx bx-package'></i> Nuevo Producto</h2>
+            <form wire:submit.prevent="saveProducto">
+                <div class="form-grid">
+                    <!-- Fila 1: Nombre y Marca -->
+                    <div class="form-group">
+                        <label for="nombre">Nombre *</label>
+                        <input type="text" id="nombre" wire:model="nombre"
+                               onkeypress="return /^[a-zA-Z0-9\s]+$/.test(event.key)"
+                               oninput="this.value = this.value.replace(/[^a-zA-Z0-9\s]/g, '')">
+                        @error('nombre') <span class="error">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="form-group">
+                        <label for="marca">Marca *</label>
+                        <input type="text" id="marca" wire:model="marca"
+                               onkeypress="return /^[a-zA-Z0-9\s]+$/.test(event.key)"
+                               oninput="this.value = this.value.replace(/[^a-zA-Z0-9\s]/g, '')">
+                        @error('marca') <span class="error">{{ $message }}</span> @enderror
+                    </div>
+                    <!-- Fila 2: Modelo y Color -->
+                    <div class="form-group">
+                        <label for="modelo">Modelo</label>
+                        <input type="text" id="modelo" wire:model="modelo"
+                               onkeypress="return /^[a-zA-Z0-9\s]+$/.test(event.key)"
+                               oninput="this.value = this.value.replace(/[^a-zA-Z0-9\s]/g, '')">
+                        @error('modelo') <span class="error">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="form-group">
+                        <label for="color">Color</label>
+                        <input type="text" id="color" wire:model="color"
+                               onkeypress="return /^[a-zA-Z]+$/.test(event.key)"
+                               oninput="this.value = this.value.replace(/[^a-zA-Z]/g, '')">
+                        @error('color') <span class="error">{{ $message }}</span> @enderror
+                    </div>
+                    <!-- Fila 3: Categoría y Precio Venta -->
+                    <div class="form-group">
+                        <label for="categoria_id">Categoría *</label>
+                        <div class="input-group">
+                            <select id="categoria_id" wire:model="categoria_id">
+                                <option value="">Seleccionar categoría</option>
+                                @foreach($categorias as $categoria)
+                                    <option value="{{ $categoria->id }}">{{ $categoria->nombre }}</option>
+                                @endforeach
+                            </select>
+                            <button type="button" class="btn btn-icon btn-primary btn-sm" wire:click="openCategoriaModal">
+                                <i class='bx bx-plus'></i>
+                            </button>
+                        </div>
+                        @error('categoria_id') <span class="error">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="form-group">
+                        <label for="precio_venta">Precio Venta *</label>
+                        <input type="number" id="precio_venta" wire:model="precio_venta" step="0.01" min="0"
+                               onkeydown="return !['e', 'E', '+', '-'].includes(event.key)"
+                               oninput="this.value = this.value.replace(/[^0-9.]/g, '')">
+                        @error('precio_venta') <span class="error">{{ $message }}</span> @enderror
+                    </div>
+                    <!-- Fila 4: Stock Inicial (solo un campo, ocupará ambas columnas) -->
+                    <div class="form-group full-width">
+                        <label for="stock">Stock Inicial *</label>
+                        <input type="number" id="stock" wire:model="stock" min="0"
+                               onkeydown="return !['e', 'E', '+', '-'].includes(event.key)"
+                               oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                        @error('stock') <span class="error">{{ $message }}</span> @enderror
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-cancelar" wire:click="closeProductoModal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class='bx bx-save'></i> Guardar Producto
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+@endif
+ @if($showCategoriaModal)
+    <div class="modal" style="display: flex;">
+        <div class="modal-content">
+            <span class="modal-close" wire:click="closeCategoriaModal">×</span>
+            <h2><i class='bx bx-category'></i> Nueva Categoría</h2>
+            <form wire:submit.prevent="guardarCategoria">
+                <div class="form-group">
+                    <label for="modal_cat_nombre">Nombre de la Categoría *</label>
+                    <input type="text" id="modal_cat_nombre" wire:model="nuevaCategoria.nombre" required
+                           onkeypress="return /^[a-zA-Z0-9\s]+$/.test(event.key)"
+                           oninput="this.value = this.value.replace(/[^a-zA-Z0-9\s]/g, '')">
+                    @error('nuevaCategoria.nombre') <span class="error">{{ $message }}</span> @enderror
+                </div>
+                <div class="form-group">
+                    <label for="modal_cat_descripcion">Descripción *</label>
+                    <textarea id="modal_cat_descripcion" wire:model="nuevaCategoria.descripcion" rows="3" required
+                              onkeypress="return /^[a-zA-Z0-9\s]+$/.test(event.key)"
+                              oninput="this.value = this.value.replace(/[^a-zA-Z0-9\s]/g, '')"></textarea>
+                    @error('nuevaCategoria.descripcion') <span class="error">{{ $message }}</span> @enderror
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class='bx bx-save'></i> Guardar Categoría
+                    </button>
+                    <button type="button" class="btn btn-secondary" wire:click="closeCategoriaModal">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    @endif
 </div>
 @livewireScripts
 </body>

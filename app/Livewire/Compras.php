@@ -305,36 +305,44 @@ class Compras extends Component
         }
     }
 
-    // Guarda una nueva categoría en la base de datos
-    public function guardarCategoria()
-    {
-        $this->validate([
-            'nuevaCategoria.nombre' => 'required|string|max:255|not_regex:/^\s*$/',
-            'nuevaCategoria.descripcion' => 'required|string|max:500|not_regex:/^\s*$/',
-        ], [
-            'nuevaCategoria.nombre.required' => 'El nombre de la categoría es obligatorio.',
-            'nuevaCategoria.nombre.not_regex' => 'El nombre de la categoría no puede contener solo espacios.',
-            'nuevaCategoria.descripcion.required' => 'La descripción de la categoría es obligatoria.',
-            'nuevaCategoria.descripcion.not_regex' => 'La descripción de la categoría no puede contener solo espacios.',
+   public function guardarCategoria()
+{
+    $this->validate([
+        'nuevaCategoria.nombre' => [
+            'required',
+            'string',
+            'max:255',
+            'not_regex:/^\s*$/',
+            'unique:categorias,nombre', // Validar que el nombre sea único en la tabla categorias
+        ],
+        'nuevaCategoria.descripcion' => 'required|string|max:500|not_regex:/^\s*$/',
+    ], [
+        'nuevaCategoria.nombre.required' => 'El nombre de la categoría es obligatorio.',
+        'nuevaCategoria.nombre.not_regex' => 'El nombre de la categoría no puede contener solo espacios.',
+        'nuevaCategoria.nombre.unique' => 'Ya existe una categoría con este nombre.',
+        'nuevaCategoria.descripcion.required' => 'La descripción de la categoría es obligatoria.',
+        'nuevaCategoria.descripcion.not_regex' => 'La descripción de la categoría no puede contener solo espacios.',
+    ]);
+
+    try {
+        $idTemporalidad = $this->obtenerIdTemporalidadActual();
+
+        $categoria = Categoria::create([
+            'nombre' => $this->nuevaCategoria['nombre'],
+            'descripcion' => $this->nuevaCategoria['descripcion'],
+            'id_temporalidad' => $idTemporalidad,
         ]);
 
-        try {
-            $idTemporalidad = $this->obtenerIdTemporalidadActual();
-
-            $categoria = Categoria::create([
-                'nombre' => $this->nuevaCategoria['nombre'],
-                'descripcion' => $this->nuevaCategoria['descripcion'],
-                'id_temporalidad' => $idTemporalidad
-            ]);
-
-            $this->buscarCategorias();
-            $this->categoria_id = $categoria->id;
-            $this->searchTermCategoria = $categoria->nombre;
-            $this->closeCategoriaModal();
-        } catch (\Exception $e) {
-            Log::error('Error al crear categoría: ' . $e->getMessage());
-        }
+        $this->buscarCategorias();
+        $this->categoria_id = $categoria->id;
+        $this->searchTermCategoria = $categoria->nombre;
+        $this->closeCategoriaModal();
+        session()->flash('message', 'Categoría creada correctamente.');
+    } catch (\Exception $e) {
+        Log::error('Error al crear categoría: ' . $e->getMessage());
+        session()->flash('error', 'Error al crear la categoría: ' . $e->getMessage());
     }
+}
 
     // Agrega un producto existente a la lista de productos
     public function agregarProductoExistente()

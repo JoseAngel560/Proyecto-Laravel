@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
 
+
 class Facturacion extends Component
 {
     public $proximoFacturaId;
@@ -37,11 +38,22 @@ class Facturacion extends Component
     public $subtotal = 0;
     public $ivaTotal = 0;
     public $ivaResumen = 0;
+    public $showProductoModal = false;
+    public $nombre;
+    public $marca;
+    public $modelo;
+    public $color;
+    public $precio_venta;
+    public $stock;
     public $total = 0;
     public $showModalNuevoCliente = false;
     public $showModalProductoManual = false;
     public $showModalTarjeta = false;
     public $showModalPdf = false;
+    public $showCategoriaModal = false;
+    public $categoriaId;
+    public $nombreCategoria;
+    public $descripcionCategoria;
     public $pdfBase64 = '';
     public $pdfErrorMessage = '';
     public $nuevoCliente = [
@@ -49,6 +61,10 @@ class Facturacion extends Component
         'apellido' => '',
         'telefono' => '',
         'direccion' => ''
+    ];
+    public $nuevaCategoria = [
+        'nombre' => '',
+        'descripcion' => ''
     ];
     public $tarjetaNombreTitular = '';
     public $tarjetaNumero = '';
@@ -87,6 +103,18 @@ class Facturacion extends Component
         'nuevoCliente.apellido.not_regex' => 'El apellido no puede contener solo espacios.',
         'nuevoCliente.telefono.required' => 'El teléfono del cliente es obligatorio.',
         'nuevoCliente.telefono.not_regex' => 'El teléfono no puede contener solo espacios.',
+        // Nuevos mensajes añadidos
+    'nombre.required' => 'El nombre del producto es obligatorio.',
+    'nombre.not_regex' => 'El nombre no puede contener solo espacios.',
+    'marca.required' => 'La marca es obligatoria.',
+    'marca.not_regex' => 'La marca no puede contener solo espacios.',
+    'categoria_id.required' => 'Debe seleccionar una categoría.',
+    'categoria_id.exists' => 'La categoría seleccionada no existe.',
+    'precio_venta.required' => 'El precio de venta es obligatorio.',
+    'precio_venta.numeric' => 'El precio de venta debe ser un número.',
+    'stock.required' => 'El stock inicial es obligatorio.',
+    'stock.integer' => 'El stock debe ser un número entero.',
+    'stock.min' => 'El stock inicial debe ser mayor a 0.',
     ];
 
     // Inicializa los valores por defecto al cargar el componente
@@ -100,11 +128,81 @@ class Facturacion extends Component
         Log::debug('Componente Facturacion montado', ['proximoFacturaId' => $this->proximoFacturaId]);
     }
 
-    // Renderiza la vista del componente
-    public function render()
+    // Abre el modal para crear una nueva categoría
+    public function openCategoriaModal()
     {
-        return view('livewire.facturacion');
+        $this->resetValidation();
+        $this->nuevaCategoria = [
+            'nombre' => '',
+            'descripcion' => ''
+        ];
+        $this->showCategoriaModal = true;
     }
+    
+    // Cierra el modal de categoría
+    public function closeCategoriaModal()
+    {
+        $this->showCategoriaModal = false;
+    }
+    
+     // Resetea los campos del formulario de categoría
+    private function resetCategoriaForm()
+    {
+        $this->categoriaId = null;
+        $this->nombreCategoria = '';
+        $this->descripcionCategoria = '';
+    }
+    // Guarda una nueva categoría en la base de datos
+public function guardarCategoria()
+{
+    $this->validate([
+        'nuevaCategoria.nombre' => [
+            'required',
+            'string',
+            'max:255',
+            'not_regex:/^\s*$/',
+            'unique:categorias,nombre', // Validar que el nombre sea único en la tabla categorias
+        ],
+        'nuevaCategoria.descripcion' => 'required|string|max:500|not_regex:/^\s*$/',
+    ], [
+        'nuevaCategoria.nombre.required' => 'El nombre de la categoría es obligatorio.',
+        'nuevaCategoria.nombre.not_regex' => 'El nombre de la categoría no puede contener solo espacios.',
+        'nuevaCategoria.nombre.unique' => 'Ya existe una categoría con este nombre.',
+        'nuevaCategoria.descripcion.required' => 'La descripción de la categoría es obligatoria.',
+        'nuevaCategoria.descripcion.not_regex' => 'La descripción de la categoría no puede contener solo espacios.',
+    ]);
+
+    try {
+        $idTemporalidad = $this->obtenerIdTemporalidadActual();
+
+        $categoria = Categoria::create([
+            'nombre' => $this->nuevaCategoria['nombre'],
+            'descripcion' => $this->nuevaCategoria['descripcion'],
+            'id_temporalidad' => $idTemporalidad,
+        ]);
+
+        $this->buscarCategorias();
+        $this->categoria_id = $categoria->id;
+        $this->searchTermCategoria = $categoria->nombre;
+        $this->closeCategoriaModal();
+        session()->flash('message', 'Categoría creada correctamente.');
+    } catch (\Exception $e) {
+        Log::error('Error al crear categoría: ' . $e->getMessage());
+        session()->flash('error', 'Error al crear la categoría: ' . $e->getMessage());
+    }
+}
+
+    // Renderiza la vista del componente
+public function render()
+{
+    return view('livewire.facturacion', [
+        'clientesFiltrados' => $this->clientesFiltrados,
+        'categoriasFiltradas' => $this->categoriasFiltradas,
+        'productosFiltrados' => $this->productosFiltrados,
+        'categorias' => Categoria::orderBy('nombre')->get(),
+    ]);
+}
+
 
     // Verifica si hay cambios no guardados en el formulario
     #[On('check-unsaved-changes')]
@@ -148,6 +246,106 @@ class Facturacion extends Component
         ];
     }
 
+    // Método para abrir el modal de nuevo producto
+public function openProductoModal()
+{
+    $this->resetValidation();
+    $this->resetProductoForm();
+    $this->showProductoModal = true;
+    Log::debug('Modal de nuevo producto abierto');
+}
+
+// Método para cerrar el modal de nuevo producto
+public function closeProductoModal()
+{
+    $this->showProductoModal = false;
+    $this->resetProductoForm();
+    Log::debug('Modal de nuevo producto cerrado');
+}
+
+// Método para resetear el formulario de producto
+private function resetProductoForm()
+{
+    $this->nombre = '';
+    $this->marca = '';
+    $this->modelo = '';
+    $this->color = '';
+    $this->categoria_id = '';
+    $this->precio_venta = '';
+    $this->stock = '';
+    $this->resetValidation();
+}
+
+// Método para guardar el nuevo producto
+public function saveProducto()
+{
+    $this->validate([
+        'nombre' => 'required|string|max:255|not_regex:/^\s*$/',
+        'marca' => 'required|string|max:100|not_regex:/^\s*$/',
+        'modelo' => 'nullable|string|max:100',
+        'color' => 'nullable|string|max:50',
+        'categoria_id' => 'required|exists:categorias,id',
+        'precio_venta' => 'required|numeric|min:0',
+        'stock' => 'required|integer|min:1',
+    ]);
+
+    try {
+        DB::beginTransaction();
+
+        $temporalidadId = $this->obtenerIdTemporalidadActual();
+
+        $producto = Producto::create([
+            'nombre' => $this->nombre,
+            'marca' => $this->marca,
+            'modelo' => $this->modelo,
+            'color' => $this->color,
+            'id_categoria' => $this->categoria_id,
+            'precio_venta' => $this->precio_venta,
+            'stock' => $this->stock,
+            'id_temporalidad' => $temporalidadId,
+            'estado' => 'activo',
+        ]);
+
+        if ($this->stock > 0) {
+            $temporalidadMovimientoId = $this->obtenerIdTemporalidadActual();
+            MovimientoInventario::create([
+                'id_producto' => $producto->id,
+                'tipo' => 'entrada',
+                'cantidad' => $this->stock,
+                'fecha' => now(),
+                'descripcion' => 'Stock inicial desde facturación',
+                'id_temporalidad' => $temporalidadMovimientoId,
+            ]);
+        }
+
+        // Agregar el producto a la factura
+        $this->productosEnFactura[] = [
+            'producto_id' => $producto->id,
+            'categoria' => $producto->categoria->nombre ?? 'Sin categoría',
+            'nombre_producto' => $producto->nombre,
+            'marca_producto' => $producto->marca ?? '',
+            'modelo_producto' => $producto->modelo ?? '',
+            'color_producto' => $producto->color ?? '',
+            'stock' => $producto->stock,
+            'cantidad' => 1,
+            'precio_unitario' => $producto->precio_venta ?? 0,
+            'iva' => 15,
+            'subtotal' => $producto->precio_venta ?? 0,
+        ];
+
+        $this->calcularTotales();
+
+        DB::commit();
+        session()->flash('message', 'Producto creado y agregado a la factura correctamente.');
+        Log::debug("Producto creado desde facturación ID: {$producto->id}");
+        $this->closeProductoModal();
+        $this->resetProductoForm();
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Error al guardar producto desde facturación: ' . $e->getMessage());
+        session()->flash('error', 'Error al guardar el producto: ' . $e->getMessage());
+    }
+}
     // Define las reglas de validación para el código del producto
     protected function rulesForCodigoProducto()
     {
