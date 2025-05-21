@@ -12,7 +12,6 @@
 <body>
 <div class="container">
     <div class="particles"></div>
-    
     <div class="login-section">
         <div class="login-container">
             <div class="logo-container">
