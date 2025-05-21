@@ -164,7 +164,7 @@
                                                oninput="this.value = this.value.replace(/[^0-9.]/g, '');" required readonly>
                                         @error('productosEnFactura.{{ $index }}.iva') <span class="error">{{ $message }}</span> @enderror
                                     </td>
-                                    <td>${{ number_format($item['subtotal'] ?? 0, 2) }}</td>
+                                    <td>C${{ number_format($item['subtotal'] ?? 0, 2) }}</td>
                                     <td>
                                         <button type="button" class="btn btn-icon btn-danger" wire:click="eliminarProducto({{ $index }})">
                                             <i class='bx bx-trash'></i>
