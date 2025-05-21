@@ -46,6 +46,14 @@
                         </a>
                     </li>
                     @endif
+                    @if($accessibleSections['devoluciones'])
+                    <li class="nav-link">
+                        <a href="#" wire:click.prevent="navigate('devoluciones')" class="{{ $activeSection === 'devoluciones' ? 'active' : '' }}">
+                            <i class='bx bx-undo icon'></i>
+                            <span class="text nav-text">Devoluciones</span>
+                        </a>
+                    </li>
+                    @endif
                     @if($accessibleSections['inventario'])
                     <li class="nav-link">
                         <a href="#" wire:click.prevent="navigate('inventario')" class="{{ $activeSection === 'inventario' ? 'active' : '' }}">
@@ -125,7 +133,7 @@
         <div class="modal-content">
             <span class="modal-close" wire:click="cancelNavigation">×</span>
             <h2><i class='bx bx-warning'></i> Cambios no guardados</h2>
-            <p>Hay datos no guardados en la sección de Compras. ¿Estás seguro de que deseas salir? Los datos no guardados se perderán.</p>
+            <p>¿Estás seguro de que deseas salir? Los datos no guardados se perderán.</p>
             <div class="form-actions">
                 <button type="button" class="btn btn-primary" wire:click="confirmNavigation">
                     <i class='bx bx-check'></i> Sí, salir
@@ -150,122 +158,139 @@
     @endif
 
     <section class="home {{ $darkMode ? 'dark' : '' }}" id="homeElement">
-        <div id="inicio-content" class="section-content" style="{{ $activeSection !== 'inicio' ? 'display: none;' : '' }}">
-            <div class="logo-full">
-                <img src="{{ asset('Images/Recurso 28.png') }}" alt="Logo Completo">
+        <!-- ... (Unchanged HTML: head, sidebar, modals, etc.) -->
+
+<div id="inicio-content" class="section-content" style="{{ $activeSection !== 'inicio' ? 'display: none;' : '' }}">
+    <div class="logo-full">
+        <img src="{{ asset('Images/Recurso 28.png') }}" alt="Logo Completo">
+    </div>
+
+    <div class="dashboard-container">
+        @if($activeSection === 'inicio' && $accessibleSections['database-backup'])
+        <div class="database-backup-button">
+            <button class="btn-backup" wire:click="openDatabaseModal">
+                <i class='bx bx-data'></i> Realizar Respaldo
+            </button>
+        </div>
+        @endif
+
+        <div class="dashboard-indicators">
+            <div class="indicator-card">
+                <h3>Ventas del Día</h3>
+                <p>{{ $ventasDia ?? 'C$0,00' }}</p>
+                <span class="trend {{ $variacionVentasDia >= 0 ? 'up' : 'down' }}">
+                    {{ $variacionVentasDia !== null ? ($variacionVentasDia >= 0 ? '+' : '') . number_format($variacionVentasDia, 2, ',', '.') . '%' : '' }} desde ayer
+                </span>
             </div>
-
-            <div class="dashboard-container">
-                @if($activeSection === 'inicio' && $accessibleSections['database-backup'])
-                <div class="database-backup-button">
-                    <button class="btn-backup" wire:click="openDatabaseModal">
-                        <i class='bx bx-data'></i> Realizar Respaldo
-                    </button>
-                </div>
-                @endif
-
-                <div class="dashboard-indicators">
-                    <div class="indicator-card">
-                        <h3>Ventas del Día</h3>
-                        <p>{{ $ventasDia ?? 'C$0,00' }}</p>
-                        <span class="trend {{ $variacionVentasDia >= 0 ? 'up' : 'down' }}">
-                            {{ $variacionVentasDia !== null ? ($variacionVentasDia >= 0 ? '+' : '') . number_format($variacionVentasDia, 2, ',', '.') . '%' : '' }} desde ayer
-                        </span>
-                    </div>
-                    <div class="indicator-card">
-                        <h3>Productos Vendidos Hoy</h3>
-                        <p>{{ $productosVendidosHoy ?? 0 }}</p>
-                        <span class="trend {{ $variacionProductosVendidos >= 0 ? 'up' : 'down' }}">
-                            {{ $variacionProductosVendidos !== null ? ($variacionProductosVendidos >= 0 ? '+' : '') . number_format($variacionProductosVendidos, 2, ',', '.') . '%' : '' }} desde ayer
-                        </span>
-                    </div>
-                    <div class="indicator-card">
-                        <h3>Nuevos Clientes</h3>
-                        <p>{{ $nuevosClientes ?? 0 }}</p>
-                        <span class="trend up">{{ $variacionNuevosClientes !== null ? '+' . number_format($variacionNuevosClientes, 2, ',', '.') . '%' : '' }} desde ayer</span>
-                    </div>
-                    <div class="indicator-card warning">
-                        <h3>Productos Bajos</h3>
-                        <p>{{ $productosBajos ?? 0 }}</p>
-                        <span class="trend warning">Requieren atención</span>
-                    </div>
-                </div>
-
-                <div class="dashboard-content">
-                    <div class="chart-section">
-                        <h3>Ventas Mensuales</h3>
-                        <canvas id="ventasMensualesChart" height="200"></canvas>
-                    </div>
-
-                    <div class="list-section">
-                        <h3>Productos Más Vendidos</h3>
-                        <ul class="product-list">
-                            @foreach ($productosMasVendidos ?? [] as $producto)
-                                <li>{{ $producto['nombre'] }} - SKU: {{ $producto['sku'] }} <span>{{ $producto['cantidad'] }} uds</span></li>
-                            @endforeach
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="dashboard-tables">
-                    <div class="table-section">
-                        <h3>Últimas Ventas</h3>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Cliente</th>
-                                    <th>Factura</th>
-                                    <th>Monto</th>
-                                    <th>Estado</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($ultimasVentas ?? [] as $venta)
-                                    <tr>
-                                        <td>{{ $venta['cliente'] }}</td>
-                                        <td>{{ $venta['factura'] }}</td>
-                                        <td>{{ $venta['monto'] }}</td>
-                                        <td class="status {{ $venta['estado'] === 'Pagado' ? 'paid' : 'pending' }}">{{ $venta['estado'] }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="table-section">
-                        <h3>Productos con Bajo Stock</h3>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Producto</th>
-                                    <th>SKU</th>
-                                    <th>Stock</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($productosBajosStock ?? [] as $producto)
-                                    <tr>
-                                        <td>{{ $producto['nombre'] }}</td>
-                                        <td>{{ $producto['sku'] }}</td>
-                                        <td>{{ $producto['stock'] }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            <div class="indicator-card">
+                <h3>Productos Vendidos Hoy</h3>
+                <p>{{ $productosVendidosHoy ?? 0 }}</p>
+                <span class="trend {{ $variacionProductosVendidos >= 0 ? 'up' : 'down' }}">
+                    {{ $variacionProductosVendidos !== null ? ($variacionProductosVendidos >= 0 ? '+' : '') . number_format($variacionProductosVendidos, 2, ',', '.') . '%' : '' }} desde ayer
+                </span>
             </div>
-
-            <div class="footer-buttons">
-                <a href="{{ route('manual-usuario') }}" class="btn-footer">Cómo Usar el Sistema</a>
-                <a href="{{ route('creadores') }}" class="btn-footer">Sobre los Creadores</a>
+            <div class="indicator-card">
+                <h3>Nuevos Clientes</h3>
+                <p>{{ $nuevosClientes ?? 0 }}</p>
+                <span class="trend up">{{ $variacionNuevosClientes !== null ? '+' . number_format($variacionNuevosClientes, 2, ',', '.') . '%' : '' }} desde ayer</span>
+            </div>
+            <div class="indicator-card warning">
+                <h3>Productos Bajos</h3>
+                <p>{{ $productosBajos ?? 0 }}</p>
+                <span class="trend warning">Requieren atención</span>
             </div>
         </div>
+
+        <div class="dashboard-content">
+           <div class="chart-section">
+                 <h3>Ventas Mensuales</h3>
+                 <canvas id="ventasMensualesChart"></canvas>
+              </div>
+
+            <div class="list-section">
+                <h3>Productos Más Vendidos</h3>
+                <ul class="product-list">
+                    @foreach ($productosMasVendidos ?? [] as $producto)
+                        <li>
+                            {{ $producto['categoria'] }} - {{ $producto['nombre'] }} ({{ $producto['codigo'] }}) 
+                            <span>{{ $producto['cantidad'] }} uds</span>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        </div>
+
+        <div class="dashboard-tables">
+            <div class="table-section">
+                <h3>Últimas Ventas</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Factura</th>
+                            <th>Monto</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($ultimasVentas ?? [] as $venta)
+                            <tr>
+                                <td>{{ $venta['cliente'] }}</td>
+                                <td>{{ $venta['factura'] }}</td>
+                                <td>{{ $venta['monto'] }}</td>
+                                <td class="status {{ $venta['estado'] === 'Pagado' ? 'paid' : 'pending' }}">{{ $venta['estado'] }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="table-section">
+                <h3>Productos con Bajo Stock</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Categoría</th>
+                            <th>Producto</th>
+                            <th>Código</th>
+                            <th>Stock</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($productosBajosStock ?? [] as $producto)
+                            <tr>
+                                <td>{{ $producto['categoria'] }}</td>
+                                <td>{{ $producto['nombre'] }}</td>
+                                <td>{{ $producto['codigo'] }}</td>
+                                <td>{{ $producto['stock'] }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer-buttons">
+        <a href="{{ route('manual-usuario') }}" class="btn-footer">Cómo Usar el Sistema</a>
+        <a href="{{ route('creadores') }}" class="btn-footer">Sobre los Creadores</a>
+    </div>
+</div>
+
+<!-- ... (Unchanged sections: facturacion-content, devoluciones-content, etc.) -->
 
         @if($accessibleSections['facturacion'])
         <div id="facturacion-content" class="section-content" style="{{ $activeSection !== 'facturacion' ? 'display: none;' : '' }}">
             @if($activeSection === 'facturacion')
                 @livewire('facturacion')
+            @endif
+        </div>
+        @endif
+
+         @if($accessibleSections['devoluciones'])
+        <div id="devoluciones-content" class="section-content" style="{{ $activeSection !== 'devoluciones' ? 'display: none;' : '' }}">
+            @if($activeSection === 'devoluciones')
+                @livewire('devoluciones')
             @endif
         </div>
         @endif
@@ -321,92 +346,145 @@
 
     @livewireScripts
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        let darkMode = {{ $darkMode ? 'true' : 'false' }};
-        const htmlElement = document.getElementById('htmlElement');
-        const bodyElement = document.getElementById('bodyElement');
-        const homeElement = document.getElementById('homeElement');
-        const sidebarElement = document.getElementById('sidebarElement');
-        const switchElement = document.getElementById('switchElement');
-        const modeText = document.getElementById('modeText');
-        const darkModeToggle = document.getElementById('darkModeToggle');
+   <script>
+document.addEventListener('DOMContentLoaded', function() {
+    let darkMode = {{ $darkMode ? 'true' : 'false' }};
+    const htmlElement = document.getElementById('htmlElement');
+    const bodyElement = document.getElementById('bodyElement');
+    const homeElement = document.getElementById('homeElement');
+    const sidebarElement = document.getElementById('sidebarElement');
+    const switchElement = document.getElementById('switchElement');
+    const modeText = document.getElementById('modeText');
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    let ventasChart = null;
 
-        function updateDarkModeUI(isDark) {
-            if (isDark) {
-                htmlElement.classList.add('dark');
-                bodyElement.classList.add('dark');
-                homeElement.classList.add('dark');
-                sidebarElement.classList.add('dark');
-                switchElement.classList.add('dark');
-                modeText.textContent = 'Modo Claro';
-            } else {
-                htmlElement.classList.remove('dark');
-                bodyElement.classList.remove('dark');
-                homeElement.classList.remove('dark');
-                sidebarElement.classList.remove('dark');
-                switchElement.classList.remove('dark');
-                modeText.textContent = 'Modo Oscuro';
-            }
-        }
+    function getChartColors(isDark) {
+        return {
+            backgroundColor: isDark ? '#4a90e2' : '#1a73e8',
+            borderColor: isDark ? '#4a90e2' : '#1a73e8',
+            textColor: isDark ? '#ffffff' : '#031A2A',
+            gridColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+        };
+    }
 
-        function syncDarkModeWithServer(isDark) {
-            fetch('/toggle-dark-mode', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                },
-                body: JSON.stringify({ darkMode: isDark })
-            }).catch(error => console.error('Error al sincronizar modo oscuro:', error));
-        }
-
-        darkModeToggle.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            darkMode = !darkMode;
-            updateDarkModeUI(darkMode);
-            localStorage.setItem('darkMode', darkMode ? 'true' : 'false');
-            syncDarkModeWithServer(darkMode);
-        });
-
-        const savedDarkMode = localStorage.getItem('darkMode');
-        if (savedDarkMode !== null) {
-            darkMode = savedDarkMode === 'true';
-            updateDarkModeUI(darkMode);
-            if (darkMode !== {{ $darkMode ? 'true' : 'false' }}) {
-                syncDarkModeWithServer(darkMode);
-            }
-        }
-
+    function initializeChart(isDark) {
         const ctx = document.getElementById('ventasMensualesChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: @json($meses),
-                datasets: [{
-                    label: 'Ventas Mensuales (C$)',
-                    data: @json($ventasMensuales),
-                    backgroundColor: '#1a73e8',
-                    borderColor: '#1a73e8',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                return 'C$' + value.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const colors = getChartColors(isDark);
+
+        if (ventasChart) {
+            // Update existing chart instead of destroying
+            ventasChart.data.datasets[0].backgroundColor = colors.backgroundColor;
+            ventasChart.data.datasets[0].borderColor = colors.borderColor;
+            ventasChart.options.scales.y.ticks.color = colors.textColor;
+            ventasChart.options.scales.y.grid.color = colors.gridColor;
+            ventasChart.options.scales.x.ticks.color = colors.textColor;
+            ventasChart.options.scales.x.grid.color = colors.gridColor;
+            ventasChart.options.plugins.legend.labels.color = colors.textColor;
+            ventasChart.update();
+        } else {
+            // Initialize new chart
+            ventasChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: @json($meses),
+                    datasets: [{
+                        label: 'Ventas Mensuales (C$)',
+                        data: @json($ventasMensuales),
+                        backgroundColor: colors.backgroundColor,
+                        borderColor: colors.borderColor,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'C$' + value.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                },
+                                color: colors.textColor
+                            },
+                            grid: {
+                                color: colors.gridColor
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: colors.textColor
+                            },
+                            grid: {
+                                color: colors.gridColor
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: colors.textColor
                             }
                         }
                     }
                 }
-            }
+            });
+        }
+    }
+
+    function updateDarkModeUI(isDark) {
+        if (isDark) {
+            htmlElement.classList.add('dark');
+            bodyElement.classList.add('dark');
+            homeElement.classList.add('dark');
+            sidebarElement.classList.add('dark');
+            switchElement.classList.add('dark');
+            modeText.textContent = 'Modo Claro';
+        } else {
+            htmlElement.classList.remove('dark');
+            bodyElement.classList.remove('dark');
+            homeElement.classList.remove('dark');
+            sidebarElement.classList.remove('dark');
+            switchElement.classList.remove('dark');
+            modeText.textContent = 'Modo Oscuro';
+        }
+        // Delay chart update to ensure layout stabilizes
+        requestAnimationFrame(() => {
+            initializeChart(isDark);
         });
+    }
+
+    function syncDarkModeWithServer(isDark) {
+        fetch('/toggle-dark-mode', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({ darkMode: isDark })
+        }).catch(error => console.error('Error al sincronizar modo oscuro:', error));
+    }
+
+    darkModeToggle.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        darkMode = !darkMode;
+        updateDarkModeUI(darkMode);
+        localStorage.setItem('darkMode', darkMode ? 'true' : 'false');
+        syncDarkModeWithServer(darkMode);
     });
-    </script>
+
+    // Initialize chart and UI based on saved or server dark mode
+    const savedDarkMode = localStorage.getItem('darkMode');
+    if (savedDarkMode !== null) {
+        darkMode = savedDarkMode === 'true';
+    }
+    updateDarkModeUI(darkMode);
+    if (darkMode !== {{ $darkMode ? 'true' : 'false' }}) {
+        syncDarkModeWithServer(darkMode);
+    }
+});
+</script>
 </body>
 </html>
 </div>

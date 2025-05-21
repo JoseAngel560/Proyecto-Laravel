@@ -10,6 +10,9 @@ use App\Models\Factura;
 use App\Models\DetalleFactura;
 use App\Models\Producto;
 use App\Models\Cliente;
+use App\Livewire\Compras;
+use App\Livewire\Facturacion;
+use App\Livewire\Devoluciones;
 use Carbon\Carbon;
 
 class NavigationMenu extends Component
@@ -64,9 +67,13 @@ class NavigationMenu extends Component
     // Maneja la navegación entre secciones, verificando cambios no guardados
     public function navigate($section)
     {
-        if (in_array($this->activeSection, ['compras', 'facturacion']) && $section !== $this->activeSection) {
+        if (in_array($this->activeSection, ['compras', 'facturacion', 'devoluciones']) && $section !== $this->activeSection) {
             $this->pendingSection = $section;
-            $targetClass = $this->activeSection === 'compras' ? Compras::class : Facturacion::class;
+            $targetClass = match ($this->activeSection) {
+                'compras' => Compras::class,
+                'facturacion' => Facturacion::class,
+                'devoluciones' => Devoluciones::class,
+            };
             $this->dispatch('check-unsaved-changes')->to($targetClass);
             return;
         }
@@ -124,9 +131,13 @@ class NavigationMenu extends Component
     // Inicia el proceso de cierre de sesión, verificando cambios no guardados
     public function cerrarSesion()
     {
-        if (in_array($this->activeSection, ['compras', 'facturacion'])) {
+        if (in_array($this->activeSection, ['compras', 'facturacion', 'devoluciones'])) {
             $this->pendingSection = 'logout';
-            $targetClass = $this->activeSection === 'compras' ? Compras::class : Facturacion::class;
+            $targetClass = match ($this->activeSection) {
+                'compras' => Compras::class,
+                'facturacion' => Facturacion::class,
+                'devoluciones' => Devoluciones::class,
+            };
             $this->dispatch('check-unsaved-changes')->to($targetClass);
             return;
         }
@@ -153,8 +164,7 @@ class NavigationMenu extends Component
         $this->showDatabaseModal = false;
     }
 
-    // Carga los datos del dashboard (ventas, productos, clientes, etc.)
-    private function loadDashboardData()
+       private function loadDashboardData()
     {
         // Ventas del Día
         $hoy = Carbon::today();
@@ -182,16 +192,23 @@ class NavigationMenu extends Component
         $this->productosBajos = Producto::where('stock', '<', 3)->where('estado', 'activo')->count();
 
         // Productos Más Vendidos
-        $this->productosMasVendidos = DetalleFactura::select('productos.nombre', 'productos.id as sku', \DB::raw('SUM(detalle_factura.cantidad) as cantidad'))
+        $this->productosMasVendidos = DetalleFactura::select(
+            'productos.nombre',
+            'productos.id as codigo',
+            'categorias.nombre as categoria',
+            \DB::raw('SUM(detalle_factura.cantidad) as cantidad')
+        )
             ->join('productos', 'detalle_factura.id_producto', '=', 'productos.id')
-            ->groupBy('productos.id', 'productos.nombre')
+            ->join('categorias', 'productos.id_categoria', '=', 'categorias.id')
+            ->groupBy('productos.id', 'productos.nombre', 'categorias.nombre')
             ->orderByDesc('cantidad')
             ->limit(5)
             ->get()
             ->map(function ($item) {
                 return [
+                    'categoria' => $item->categoria,
                     'nombre' => $item->nombre,
-                    'sku' => 'SKU-' . str_pad($item->sku, 3, '0', STR_PAD_LEFT),
+                    'codigo' => 'COD-' . str_pad($item->codigo, 3, '0', STR_PAD_LEFT),
                     'cantidad' => $item->cantidad
                 ];
             })->toArray();
@@ -205,18 +222,27 @@ class NavigationMenu extends Component
                 return [
                     'cliente' => $factura->cliente->nombre . ' ' . $factura->cliente->apellido,
                     'factura' => '#F-' . $factura->id,
-                    'monto' => 'C$' . number_format($factura->total, 2, ',', '.'), // Formatear en Córdobas
+                    'monto' => 'C$' . number_format($factura->total, 2, ',', '.'),
                     'estado' => $factura->totalcancelado >= $factura->total ? 'Pagado' : 'Pendiente'
                 ];
             })->toArray();
 
         // Productos con Bajo Stock
-        $this->productosBajosStock = Producto::where('stock', '<', 3)->where('estado', 'activo')
+        $this->productosBajosStock = Producto::select(
+            'productos.nombre',
+            'productos.id as codigo',
+            'productos.stock',
+            'categorias.nombre as categoria'
+        )
+            ->join('categorias', 'productos.id_categoria', '=', 'categorias.id')
+            ->where('productos.stock', '<', 3)
+            ->where('productos.estado', 'activo')
             ->get()
             ->map(function ($producto) {
                 return [
+                    'categoria' => $producto->categoria,
                     'nombre' => $producto->nombre,
-                    'sku' => 'SKU-' . str_pad($producto->id, 3, '0', STR_PAD_LEFT),
+                    'codigo' => 'COD-' . str_pad($producto->codigo, 3, '0', STR_PAD_LEFT),
                     'stock' => $producto->stock
                 ];
             })->toArray();
@@ -244,6 +270,7 @@ class NavigationMenu extends Component
         $accessibleSections = [
             'inicio' => true,
             'facturacion' => $empleado ? $empleado->hasAccessTo('facturacion') : false,
+            'devoluciones' => $empleado ? $empleado->hasAccessTo('devoluciones') : false, 
             'inventario' => $empleado ? $empleado->hasAccessTo('inventario') : false,
             'compras' => $empleado ? $empleado->hasAccessTo('compras') : false,
             'clientes' => $empleado ? $empleado->hasAccessTo('clientes') : false,

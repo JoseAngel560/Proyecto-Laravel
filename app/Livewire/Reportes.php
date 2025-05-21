@@ -11,6 +11,7 @@ use App\Models\Cliente;
 use App\Models\Empleado;
 use App\Models\MovimientoInventario;
 use App\Models\Categoria;
+use App\Models\Devolucion;
 use Exception;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
@@ -25,6 +26,8 @@ use App\Exports\ProveedoresListaExport;
 use App\Exports\ClientesListaExport;
 use App\Exports\EmpleadosListaExport;
 use App\Exports\MovimientosListaExport;
+use App\Exports\DevolucionesListaExport;
+use App\Exports\DevolucionesDetalleExport;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 
@@ -38,6 +41,9 @@ class Reportes extends Component
 
     public $comprasFilterType = 'date';
     public $comprasStartDate, $comprasEndDate, $compraId;
+
+    public $devolucionesFilterType = 'date';
+    public $devolucionesStartDate, $devolucionesEndDate, $devolucionId;
 
     public $productosCategoria = 'todas';
     public $productosOrden = 'nombre_asc';
@@ -59,7 +65,93 @@ class Reportes extends Component
         'facturaId' => ['except' => null],
         'comprasFilterType' => ['except' => 'date'],
         'compraId' => ['except' => null],
+        'devolucionesFilterType' => ['except' => 'date'],
+        'devolucionId' => ['except' => null],
     ];
+
+    // Initialize component and reset filters on load
+    public function mount()
+    {
+        $this->resetFilters();
+    }
+
+    // Reset all filter fields
+    private function resetFilters()
+    {
+        $this->reset([
+            'busqueda', 'busquedaProducto',
+            'ventasFilterType', 'ventasStartDate', 'ventasEndDate', 'facturaId',
+            'comprasFilterType', 'comprasStartDate', 'comprasEndDate', 'compraId',
+            'devolucionesFilterType', 'devolucionesStartDate', 'devolucionesEndDate', 'devolucionId',
+            'productosCategoria', 'productosOrden',
+            'movimientosProducto', 'movimientosTipo', 'movimientosStartDate', 'movimientosEndDate'
+        ]);
+        $this->ventasFilterType = 'date';
+        $this->comprasFilterType = 'date';
+        $this->devolucionesFilterType = 'date';
+        $this->productosCategoria = 'todas';
+        $this->productosOrden = 'nombre_asc';
+    }
+// Detect changes in properties and handle filter type changes
+    public function updated($propertyName)
+    {
+        if ($propertyName === 'ventasFilterType') {
+            $this->reset(['ventasStartDate', 'ventasEndDate', 'facturaId']);
+            $this->ventasFilterType = $this->ventasFilterType ?: 'date';
+        } elseif ($propertyName === 'comprasFilterType') {
+            $this->reset(['comprasStartDate', 'comprasEndDate', 'compraId']);
+            $this->comprasFilterType = $this->comprasFilterType ?: 'date';
+        } elseif ($propertyName === 'devolucionesFilterType') {
+            $this->reset(['devolucionesStartDate', 'devolucionesEndDate', 'devolucionId']);
+            $this->devolucionesFilterType = $this->devolucionesFilterType ?: 'date';
+        } elseif (str_contains($propertyName, 'Date') || str_contains($propertyName, 'Id') ||
+            str_contains($propertyName, 'Categoria') || str_contains($propertyName, 'Orden') ||
+            str_contains($propertyName, 'Tipo') || $propertyName === 'busqueda' ||
+            $propertyName === 'busquedaProducto' || $propertyName === 'movimientosProducto')
+        {
+            // No action needed; Livewire will refresh
+        }
+    }
+
+    // Clear filters specific to the active tab
+    public function limpiarFiltrosEspecificos()
+    {
+        $this->busqueda = '';
+
+                // Reset product/movement search fields unless on relevant tabs
+        if (!in_array($this->activeTab, ['productos', 'movimientos', 'devoluciones'])) {
+            $this->busquedaProducto = '';
+            $this->movimientosProducto = '';
+        }
+
+        if (!in_array($this->activeTab, ['proveedores', 'clientes', 'empleados'])) {
+            $this->busqueda = '';
+        }
+        if (!in_array($this->activeTab, ['productos', 'movimientos', 'devoluciones'])) {
+            $this->busquedaProducto = '';
+            $this->movimientosProducto = '';
+        }
+        if ($this->activeTab !== 'ventas') {
+            $this->reset(['ventasStartDate', 'ventasEndDate', 'facturaId']);
+            $this->ventasFilterType = 'date';
+        }
+        if ($this->activeTab !== 'compras') {
+            $this->reset(['comprasStartDate', 'comprasEndDate', 'compraId']);
+            $this->comprasFilterType = 'date';
+        }
+        if ($this->activeTab !== 'devoluciones') {
+            $this->reset(['devolucionesStartDate', 'devolucionesEndDate', 'devolucionId']);
+            $this->devolucionesFilterType = 'date';
+        }
+        if ($this->activeTab !== 'productos') {
+            $this->reset(['productosCategoria', 'productosOrden', 'busquedaProducto']);
+            $this->productosCategoria = 'todas';
+            $this->productosOrden = 'nombre_asc';
+        }
+        if ($this->activeTab !== 'movimientos') {
+            $this->reset(['movimientosProducto', 'movimientosTipo', 'movimientosStartDate', 'movimientosEndDate']);
+        }
+    }
 
     // Construye la consulta para obtener las ventas con filtros aplicados
     private function getVentasQuery()
@@ -129,6 +221,41 @@ class Reportes extends Component
                 }
             })
             ->orderBy('fecha_compra', 'desc');
+    }
+
+    // Construye la consulta para obtener las devoluciones con filtros aplicados
+    private function getDevolucionesQuery()
+    {
+        if ($this->devolucionesFilterType === 'id' && $this->devolucionId) {
+            return Devolucion::query()
+                ->with([
+                    'detalles.producto' => function ($query) {
+                        $query->withoutGlobalScope('active');
+                    },
+                    'factura.cliente' => function ($query) {
+                        $query->withoutGlobalScope('active');
+                    },
+                    'empleado'
+                ])
+                ->where('id', $this->devolucionId);
+        }
+
+        return Devolucion::query()
+            ->with([
+                'factura.cliente' => function ($query) {
+                    $query->withoutGlobalScope('active');
+                },
+                'empleado'
+            ])
+            ->when($this->devolucionesFilterType === 'date', function ($q) {
+                if ($this->devolucionesStartDate) {
+                    $q->whereDate('fecha_devolucion', '>=', $this->devolucionesStartDate);
+                }
+                if ($this->devolucionesEndDate) {
+                    $q->whereDate('fecha_devolucion', '<=', \Carbon\Carbon::parse($this->devolucionesEndDate)->endOfDay());
+                }
+            })
+            ->orderBy('fecha_devolucion', 'desc');
     }
 
     // Construye la consulta para obtener los productos con filtros aplicados
@@ -247,6 +374,9 @@ class Reportes extends Component
                 case 'compras':
                     $data['compras'] = $this->getComprasQuery()->get();
                     break;
+                case 'devoluciones':
+                    $data['devoluciones'] = $this->getDevolucionesQuery()->get();
+                    break;
                 case 'productos':
                     $data['productos'] = $this->getProductosQuery()->get();
                     break;
@@ -278,7 +408,9 @@ class Reportes extends Component
 
         if ($errorMessage) {
             session()->flash('error', $errorMessage . ' Revisa los logs para mas detalles.');
+            $data['ventas'] = collect();
             $data['compras'] = collect();
+            $data['devoluciones'] = collect();
             $data['productos'] = collect();
             $data['proveedores'] = collect();
             $data['clientes'] = collect();
@@ -299,19 +431,6 @@ class Reportes extends Component
         $this->activeTab = $tab;
         $this->limpiarFiltrosEspecificos();
     }
-
-    // Detecta cambios en las propiedades para actualizar la vista
-    public function updated($propertyName)
-    {
-        if (str_contains($propertyName, 'Date') || str_contains($propertyName, 'Id') ||
-            str_contains($propertyName, 'FilterType') || str_contains($propertyName, 'Categoria') ||
-            str_contains($propertyName, 'Orden') || str_contains($propertyName, 'Tipo') ||
-            $propertyName === 'busqueda' || $propertyName === 'busquedaProducto' || $propertyName === 'movimientosProducto')
-        {
-
-        }
-    }
-
     // Limpia todos los filtros generales
     public function limpiarFiltrosGenerales()
     {
@@ -319,28 +438,18 @@ class Reportes extends Component
             'busqueda', 'busquedaProducto',
             'ventasFilterType', 'ventasStartDate', 'ventasEndDate', 'facturaId',
             'comprasFilterType', 'comprasStartDate', 'comprasEndDate', 'compraId',
+            'devolucionesFilterType', 'devolucionesStartDate', 'devolucionesEndDate', 'devolucionId',
             'productosCategoria', 'productosOrden',
             'movimientosProducto', 'movimientosTipo', 'movimientosStartDate', 'movimientosEndDate'
         ]);
         $this->ventasFilterType = 'date';
         $this->comprasFilterType = 'date';
+        $this->devolucionesFilterType = 'date';
         $this->productosCategoria = 'todas';
         $this->productosOrden = 'nombre_asc';
     }
 
-    // Limpia filtros específicos según la pestaña activa
-    public function limpiarFiltrosEspecificos()
-    {
-        if (!in_array($this->activeTab, ['proveedores', 'clientes', 'empleados'])) {
-            $this->busqueda = '';
-        }
-        if (!in_array($this->activeTab, ['productos', 'movimientos'])) {
-            $this->busquedaProducto = '';
-            $this->movimientosProducto = '';
-        }
-    }
-
-    // Muestra el modal con detalles de una venta, compra o movimiento
+    // Muestra el modal con detalles de una venta, compra, devolución o movimiento
     public function showDetailsModal($type, $id)
     {
         $this->detailsType = $type;
@@ -362,6 +471,17 @@ class Reportes extends Component
                 case 'compra':
                     $this->detailsItem = Compra::with([
                         'proveedor' => function ($query) {
+                            $query->withoutGlobalScope('active');
+                        },
+                        'empleado',
+                        'detalles.producto' => function ($query) {
+                            $query->withoutGlobalScope('active');
+                        }
+                    ])->findOrFail($id);
+                    break;
+                case 'devolucion':
+                    $this->detailsItem = Devolucion::with([
+                        'factura.cliente' => function ($query) {
                             $query->withoutGlobalScope('active');
                         },
                         'empleado',
@@ -432,6 +552,10 @@ class Reportes extends Component
                 'comprasStartDate' => $this->comprasStartDate ?: 'N/A',
                 'comprasEndDate' => $this->comprasEndDate ?: 'N/A',
                 'compraId' => $this->compraId ?: 'N/A',
+                'devolucionesFilterType' => $this->devolucionesFilterType,
+                'devolucionesStartDate' => $this->devolucionesStartDate ?: 'N/A',
+                'devolucionesEndDate' => $this->devolucionesEndDate ?: 'N/A',
+                'devolucionId' => $this->devolucionId ?: 'N/A',
                 'busquedaProducto' => $this->busquedaProducto ?: 'Ninguna',
                 'productosCategoria' => $this->productosCategoria === 'todas' ? 'Todas' : ($this->productosCategoria ? Categoria::find($this->productosCategoria)->nombre : 'N/A'),
                 'productosOrden' => match ($this->productosOrden) {
@@ -463,7 +587,7 @@ class Reportes extends Component
                                 session()->flash('error', 'No hay detalles para exportar.');
                                 return;
                             }
-                            $pdfFileName = 'venta_' . $venta->id . '_' . Str::random(10) . '. women';
+                            $pdfFileName = 'venta_' . $venta->id . '_' . Str::random(10) . '.pdf';
                             $pdfPath = 'ventas/' . $pdfFileName;
                             $fullPath = storage_path('app/public/' . $pdfPath);
 
@@ -632,6 +756,98 @@ class Reportes extends Component
                     }
                     break;
 
+                case 'devoluciones':
+                    if ($format === 'pdf') {
+                        if ($this->devolucionesFilterType === 'id' && $this->devolucionId) {
+                            $devolucion = $this->getDevolucionesQuery()->first();
+                            if (!$devolucion) {
+                                Log::warning("No se encontro la devolución con ID {$this->devolucionId}");
+                                session()->flash('error', 'No se encontro la devolución con el ID especificado.');
+                                return;
+                            }
+                            $detalles = $devolucion->detalles;
+                            if ($detalles->isEmpty()) {
+                                Log::warning("No hay detalles para la devolución ID {$this->devolucionId}");
+                                session()->flash('error', 'No hay detalles para exportar.');
+                                return;
+                            }
+                            $pdfFileName = 'devolucion_' . $devolucion->id . '_' . Str::random(10) . '.pdf';
+                            $pdfPath = 'devoluciones/' . $pdfFileName;
+                            $fullPath = storage_path('app/public/' . $pdfPath);
+
+                            $pdf = Pdf::loadView('pdfs.devoluciones_detalle', [
+                                'devolucion' => $devolucion,
+                                'cliente' => $devolucion->factura ? $devolucion->factura->cliente : null,
+                                'detalles' => $detalles,
+                                'filters' => $filters,
+                            ]);
+
+                            Storage::disk('public')->put($pdfPath, $pdf->output());
+
+                            if (!Storage::disk('public')->exists($pdfPath)) {
+                                Log::error('PDF no encontrado en: ' . $pdfPath);
+                                session()->flash('error', 'El PDF no se genero correctamente.');
+                                return;
+                            }
+
+                            Log::info('PDF generado para devolución ID ' . $devolucion->id, ['pdf_path' => $pdfPath]);
+                            return response()->download($fullPath, 'comprobante_devolucion_DEV' . str_pad($devolucion->id, 6, '0', STR_PAD_LEFT) . '.pdf')->deleteFileAfterSend(true);
+                        } else {
+                            $devoluciones = $this->getDevolucionesQuery()->get();
+                            if ($devoluciones->isEmpty()) {
+                                Log::warning("No hay devoluciones para exportar con los filtros aplicados");
+                                session()->flash('error', 'No hay devoluciones para exportar con los filtros aplicados.');
+                                return;
+                            }
+                            $pdfFileName = 'devoluciones_' . Str::random(10) . '.pdf';
+                            $pdfPath = 'devoluciones/' . $pdfFileName;
+                            $fullPath = storage_path('app/public/' . $pdfPath);
+
+                            $pdf = Pdf::loadView('pdfs.devoluciones_lista', [
+                                'devoluciones' => $devoluciones,
+                                'filters' => $filters,
+                            ]);
+
+                            Storage::disk('public')->put($pdfPath, $pdf->output());
+
+                            if (!Storage::disk('public')->exists($pdfPath)) {
+                                Log::error('PDF no encontrado en: ' . $pdfPath);
+                                session()->flash('error', 'El PDF no se genero correctamente.');
+                                return;
+                            }
+
+                            Log::info('PDF generado para lista de devoluciones', ['pdf_path' => $pdfPath]);
+                            return response()->download($fullPath, $filename . '.pdf')->deleteFileAfterSend(true);
+                        }
+                    } else {
+                        if ($this->devolucionesFilterType === 'id' && $this->devolucionId) {
+                            $devolucion = $this->getDevolucionesQuery()->first();
+                            if (!$devolucion) {
+                                Log::warning("No se encontro la devolución con ID {$this->devolucionId}");
+                                session()->flash('error', 'No se encontro la devolución con el ID especificado.');
+                                return;
+                            }
+                            $detalles = $devolucion->detalles;
+                            if ($detalles->isEmpty()) {
+                                Log::warning("No hay detalles para la devolución ID {$this->devolucionId}");
+                                session()->flash('error', 'No hay detalles para exportar.');
+                                return;
+                            }
+                            Log::info("Exportando detalles de devolución ID {$this->devolucionId}, detalles: " . $detalles->count());
+                            return Excel::download(new DevolucionesDetalleExport($detalles), 'Detalles_Devolucion_' . $this->devolucionId . '.' . $format);
+                        } else {
+                            $devoluciones = $this->getDevolucionesQuery()->get();
+                            if ($devoluciones->isEmpty()) {
+                                Log::warning("No hay devoluciones para exportar con los filtros aplicados");
+                                session()->flash('error', 'No hay devoluciones para exportar con los filtros aplicados.');
+                                return;
+                            }
+                            Log::info("Exportando lista de devoluciones, count: {$devoluciones->count()}");
+                            return Excel::download(new DevolucionesListaExport($devoluciones), $filename . '.' . $format);
+                        }
+                    }
+                    break;
+
                 case 'productos':
                     if ($format === 'pdf') {
                         $productos = $this->getProductosQuery()->get();
@@ -723,7 +939,7 @@ class Reportes extends Component
                         $fullPath = storage_path('app/public/' . $pdfPath);
 
                         $pdf = Pdf::loadView('pdfs.clientes_lista', [
-                            'clientes' => $clientes,
+                            'clientes' => $client0569es,
                             'filters' => $filters,
                         ]);
 

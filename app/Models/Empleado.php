@@ -46,7 +46,7 @@ class Empleado extends Model
      * @param string $section
      * @return bool
      */
-    public function hasAccessTo($section)
+      public function hasAccessTo($section)
     {
         $permissions = [
             'Administrador' => [
@@ -59,12 +59,14 @@ class Empleado extends Model
                 'empleados',
                 'reportes',
                 'database-backup',
+                'devoluciones', 
             ],
             'Vendedor' => [
                 'inicio',
                 'facturacion',
                 'clientes',
                 'reportes',
+                'devoluciones', 
             ],
             'Inventario' => [
                 'inicio',
@@ -73,6 +75,7 @@ class Empleado extends Model
                 'clientes',
                 'proveedores',
                 'reportes',
+                'devoluciones', 
             ],
         ];
 

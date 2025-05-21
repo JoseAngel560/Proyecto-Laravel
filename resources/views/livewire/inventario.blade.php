@@ -310,6 +310,7 @@
     </div>
 </div>
 @endif
+
 @if($showCategoriaModal)
 <div class="modal" style="display: flex;">
     <div class="modal-content">

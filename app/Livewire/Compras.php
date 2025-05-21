@@ -103,6 +103,8 @@ class Compras extends Component
         return view('livewire.compras');
     }
 
+    
+
     // Verifica si hay cambios no guardados en el formulario
     #[On('check-unsaved-changes')]
     public function checkUnsavedChanges()

@@ -22,6 +22,40 @@
     --tran-05: all 0.3s ease;
 }
 
+/* Chart container */
+.chart-section {
+    background-color: var(--sidebar-color, #FFF);
+    padding: 20px;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 80%; /* Adjust based on your layout */
+    height: 40%; /* Fixed height for consistency */
+    box-sizing: border-box;
+}
+
+/* Canvas */
+.chart-section canvas {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 300px; /* Matches container */
+}
+
+/* Dark mode */
+body.dark .chart-section {
+    background-color: var(--sidebar-color, #0a2a41);
+}
+
+body.dark .chart-section canvas {
+    background-color: transparent;
+}
+
+/* Ensure dashboard-content layout is stable */
+.dashboard-content {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
 body {
     min-height: 100vh;
     background-color: var(--body-color);
