@@ -67,6 +67,8 @@ class NavigationMenu extends Component
     // Maneja la navegación entre secciones, verificando cambios no guardados
     public function navigate($section)
     {
+
+        
         if (in_array($this->activeSection, ['compras', 'facturacion', 'devoluciones']) && $section !== $this->activeSection) {
             $this->pendingSection = $section;
             $targetClass = match ($this->activeSection) {
@@ -159,10 +161,13 @@ class NavigationMenu extends Component
     }
 
     // Cierra el modal de gestión de la base de datos
-    public function closeDatabaseModal()
-    {
-        $this->showDatabaseModal = false;
-    }
+// Cierra el modal de gestión de la base de datos
+public function closeDatabaseModal()
+{
+    $this->showDatabaseModal = false;
+    $this->dispatch('modalClosed'); // 🔥 Emitir evento para actualizar el gráfico
+}
+
 
        private function loadDashboardData()
     {

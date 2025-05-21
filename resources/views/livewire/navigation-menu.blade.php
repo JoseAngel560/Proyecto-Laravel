@@ -37,6 +37,7 @@
                             <span class="text nav-text">Inicio</span>
                         </a>
                     </li>
+                    
                     @endif
                     @if($accessibleSections['facturacion'])
                     <li class="nav-link">
@@ -202,10 +203,10 @@
         </div>
 
         <div class="dashboard-content">
-           <div class="chart-section">
-                 <h3>Ventas Mensuales</h3>
-                 <canvas id="ventasMensualesChart"></canvas>
-              </div>
+            <div class="chart-section">
+        <h3>Ventas Mensuales</h3>
+        <canvas id="ventasMensualesChart" wire:ignore></canvas>
+    </div>
 
             <div class="list-section">
                 <h3>Productos Más Vendidos</h3>
@@ -346,9 +347,9 @@
 
     @livewireScripts
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-   <script>
-document.addEventListener('DOMContentLoaded', function() {
-    let darkMode = {{ $darkMode ? 'true' : 'false' }};
+    <script>
+document.addEventListener('DOMContentLoaded', function () {
+    let darkMode = localStorage.getItem('darkMode') === 'true';
     const htmlElement = document.getElementById('htmlElement');
     const bodyElement = document.getElementById('bodyElement');
     const homeElement = document.getElementById('homeElement');
@@ -356,81 +357,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const switchElement = document.getElementById('switchElement');
     const modeText = document.getElementById('modeText');
     const darkModeToggle = document.getElementById('darkModeToggle');
-    let ventasChart = null;
-
-    function getChartColors(isDark) {
-        return {
-            backgroundColor: isDark ? '#4a90e2' : '#1a73e8',
-            borderColor: isDark ? '#4a90e2' : '#1a73e8',
-            textColor: isDark ? '#ffffff' : '#031A2A',
-            gridColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-        };
-    }
-
-    function initializeChart(isDark) {
-        const ctx = document.getElementById('ventasMensualesChart').getContext('2d');
-        const colors = getChartColors(isDark);
-
-        if (ventasChart) {
-            // Update existing chart instead of destroying
-            ventasChart.data.datasets[0].backgroundColor = colors.backgroundColor;
-            ventasChart.data.datasets[0].borderColor = colors.borderColor;
-            ventasChart.options.scales.y.ticks.color = colors.textColor;
-            ventasChart.options.scales.y.grid.color = colors.gridColor;
-            ventasChart.options.scales.x.ticks.color = colors.textColor;
-            ventasChart.options.scales.x.grid.color = colors.gridColor;
-            ventasChart.options.plugins.legend.labels.color = colors.textColor;
-            ventasChart.update();
-        } else {
-            // Initialize new chart
-            ventasChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: @json($meses),
-                    datasets: [{
-                        label: 'Ventas Mensuales (C$)',
-                        data: @json($ventasMensuales),
-                        backgroundColor: colors.backgroundColor,
-                        borderColor: colors.borderColor,
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return 'C$' + value.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                },
-                                color: colors.textColor
-                            },
-                            grid: {
-                                color: colors.gridColor
-                            }
-                        },
-                        x: {
-                            ticks: {
-                                color: colors.textColor
-                            },
-                            grid: {
-                                color: colors.gridColor
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            labels: {
-                                color: colors.textColor
-                            }
-                        }
-                    }
-                }
-            });
-        }
-    }
+    let chartInstance = null;
 
     function updateDarkModeUI(isDark) {
         if (isDark) {
@@ -448,10 +375,6 @@ document.addEventListener('DOMContentLoaded', function() {
             switchElement.classList.remove('dark');
             modeText.textContent = 'Modo Oscuro';
         }
-        // Delay chart update to ensure layout stabilizes
-        requestAnimationFrame(() => {
-            initializeChart(isDark);
-        });
     }
 
     function syncDarkModeWithServer(isDark) {
@@ -465,24 +388,102 @@ document.addEventListener('DOMContentLoaded', function() {
         }).catch(error => console.error('Error al sincronizar modo oscuro:', error));
     }
 
-    darkModeToggle.addEventListener('click', function(e) {
+    darkModeToggle.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
         darkMode = !darkMode;
         updateDarkModeUI(darkMode);
         localStorage.setItem('darkMode', darkMode ? 'true' : 'false');
         syncDarkModeWithServer(darkMode);
+        if (document.getElementById('inicio-content').style.display !== 'none') {
+            initializeChart();
+        }
     });
 
-    // Initialize chart and UI based on saved or server dark mode
-    const savedDarkMode = localStorage.getItem('darkMode');
-    if (savedDarkMode !== null) {
-        darkMode = savedDarkMode === 'true';
-    }
     updateDarkModeUI(darkMode);
-    if (darkMode !== {{ $darkMode ? 'true' : 'false' }}) {
-        syncDarkModeWithServer(darkMode);
+
+    function initializeChart() {
+        const canvas = document.getElementById('ventasMensualesChart');
+        const inicioContent = document.getElementById('inicio-content');
+
+        // Verifica si el lienzo y el contenedor de inicio están disponibles y visibles
+        if (!canvas || !inicioContent || inicioContent.style.display === 'none') {
+            console.log('Lienzo o sección de inicio no disponible/visible. No se inicializa el gráfico.');
+            return;
+        }
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            console.error('Error: No se pudo obtener el contexto 2D del lienzo.');
+            return;
+        }
+
+        // Limpia el lienzo manualmente para evitar estados inconsistentes
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // No destruir el gráfico, solo actualizar los datos si ya existe
+        if (chartInstance) {
+            console.log('Actualizando datos del gráfico existente.');
+            chartInstance.data.labels = @json($meses);
+            chartInstance.data.datasets[0].data = @json($ventasMensuales);
+            chartInstance.update();
+            return;
+        }
+
+        try {
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: @json($meses),
+                    datasets: [{
+                        label: 'Ventas Mensuales (C$)',
+                        data: @json($ventasMensuales),
+                        backgroundColor: darkMode ? '#1a73e8' : '#1a73e8',
+                        borderColor: darkMode ? '#1a73e8' : '#1a73e8',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function (value) {
+                                    return 'C$' + value.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            console.log('Gráfico inicializado correctamente.');
+        } catch (error) {
+            console.error('Error al inicializar el gráfico:', error);
+        }
     }
+
+    // Inicializa el gráfico solo si la sección de inicio está visible
+    if (document.getElementById('inicio-content').style.display !== 'none') {
+        initializeChart();
+    }
+
+    // Maneja el evento de cierre del modal
+    Livewire.on('modalClosed', function () {
+        if (document.getElementById('inicio-content').style.display !== 'none') {
+            console.log('Modal cerrado, intentando reinicializar el gráfico.');
+            initializeChart();
+        }
+    });
+
+    // Maneja el evento de actualización de navegación
+    Livewire.on('refreshNavigation', function () {
+        console.log('Evento refreshNavigation recibido.');
+        if (document.getElementById('inicio-content').style.display !== 'none') {
+            initializeChart();
+        }
+    });
 });
 </script>
 </body>
